@@ -209,14 +209,12 @@
             <input type="text" id="dspNameInput" placeholder="e.g., DXYZ Logistics">
         </div>
         <div class="form-group-settings">
-            <label for="dspUrlInput">Chime Webhook URL:</label>
-            <input type="text" id="dspUrlInput" placeholder="https://hooks.chime.aws/incomingwebhooks/...">
-        </div>
+            <label for="dspUrlInput">Webhook URL (Slack/Chime):</label> <input type="text" id="dspUrlInput" placeholder="https://hooks.slack.com/services/... or https://hooks.chime.aws/incomingwebhooks/..."> </div>
         <div style="display: flex; gap: 10px;">
              <button class="btn btn-primary" id="saveDspBtn">Add DSP</button>
              <button class="btn btn-secondary hidden" id="cancelEditBtn" style="margin-top:0;">Cancel</button>
         </div>
-       
+        
     </div>
 
     <h3>Saved DSPs</h3>
@@ -254,10 +252,10 @@
         loadData();
         // Migration check for older versions data
         if(dspData.length === 0) {
-             const v2 = localStorage.getItem('dspRouteReporterData_v2');
-             const v1 = localStorage.getItem('dspRouteReporterData');
-             if(v2) { try { dspData = JSON.parse(v2); saveData(); } catch(e){} }
-             else if(v1) { try { dspData = JSON.parse(v1); saveData(); } catch(e){} }
+            const v2 = localStorage.getItem('dspRouteReporterData_v2');
+            const v1 = localStorage.getItem('dspRouteReporterData');
+            if(v2) { try { dspData = JSON.parse(v2); saveData(); } catch(e){} }
+            else if(v1) { try { dspData = JSON.parse(v1); saveData(); } catch(e){} }
         }
 
         populateDspSelect();
@@ -343,7 +341,7 @@
             const index = dspData.findIndex(d => d.id === editingDspId);
             if (index !== -1) { dspData[index].name = name; dspData[index].url = url; }
         } else {
-             dspData.push({ id: Date.now(), name: name, url: url });
+            dspData.push({ id: Date.now(), name: name, url: url });
         }
         saveData();
         resetSettingsForm();
@@ -439,8 +437,8 @@
     function hideStatus() { statusMessage.style.display = 'none'; }
 
 
-    // --- Sending to Chime ---
-    async function sendToChime() {
+    // --- Sending to Webhook ---
+    async function sendToChime() { // Function name remains for now, but sends to generic webhook
         const sendBtn = document.getElementById('sendBtn');
         const dspId = document.getElementById('dspSelect').value;
 
@@ -463,21 +461,25 @@
             const response = await fetch(selectedDsp.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // IMPORTANT: Send the current value of the preview box
-                body: JSON.stringify({ "Content": finalMessage })
+                // *** THIS IS THE CRUCIAL CHANGE FOR SLACK COMPATIBILITY ***
+                body: JSON.stringify({ "text": finalMessage }) 
             });
 
             if (response.ok) {
                 showStatus("✅ Report sent successfully!");
                 // Optional: reset manual mode on success?
-                // resetPreviewBtn.click(); 
-            } else { throw new Error(`${response.status}`); }
+                // resetPreviewBtn.click();
+            } else { 
+                const errorDetails = await response.text(); // Attempt to get error details from server
+                console.error("Webhook response error:", response.status, errorDetails);
+                throw new Error(`${response.status}: ${errorDetails || 'Unknown error from webhook.'}`); 
+            }
         } catch (error) {
-            console.error(error);
-            showStatus("❌ Failed to send. Check network or Webhook URL.", true);
+            console.error("Fetch error:", error);
+            showStatus(`❌ Failed to send. Error: ${error.message}. Check network or Webhook URL.`, true);
         } finally {
             sendBtn.disabled = false;
-            sendBtn.textContent = "Send Report to Chime";
+            sendBtn.textContent = "Send Report to Chime"; // You might want to change this button text to "Send Report" or "Send Report to Webhook"
         }
     }
 </script>
